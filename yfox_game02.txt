@@ -1,0 +1,12 @@
+*&---------------------------------------------------------------------*
+*& Report  YFOX_GAME01
+*& Chess feito por Raphael Bertani da AbapFox - Venha conhecer: www.abapfox.org
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+report  yfox_game02.
+
+include yfox_game02_dec.
+
+initialization.
+
+  lcl_main=>start( ).

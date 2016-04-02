@@ -1,0 +1,748 @@
+*&---------------------------------------------------------------------*
+*&  Include           YFOX_GAME01_IMP
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Report  YFOX_GAME01
+*& Chess feito por Raphael Bertani da AbapFox - Venha conhecer: www.abapfox.org
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_main IMPLEMENTATION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+class lcl_main implementation.
+
+  method class_constructor.
+    create object mo_me.
+  endmethod.                    "class_constructor
+
+  method close_both.
+
+    data: url  type cndp_url.
+
+    loop at mt_ycontainers into mw_ycontainers where state = 1.
+
+      call function 'DP_PUBLISH_WWW_URL'
+        exporting
+          objid    = 'YFOX_GAME01_CLICK'
+          lifetime = cndp_lifetime_transaction
+        importing
+          url      = url
+        exceptions
+          others   = 1.
+
+      call method mw_ycontainers-picture->load_picture_from_url_async
+        exporting
+          url = url.
+
+      mw_ycontainers-state = 0.
+
+      modify mt_ycontainers from mw_ycontainers.
+
+    endloop.
+
+  endmethod.                    "close_both
+
+  method constructor.
+
+    data: l_len type i.
+
+    "-->Alimenta-se aqui a tabela de relação de imagens
+
+    define ad.
+
+      clear mw_yrelation.
+
+      mw_yrelation-column = &1.
+      mw_yrelation-row = &2.
+
+      concatenate 'YFOX_CHESS_'  &3 into mw_yrelation-objname.
+      mw_yrelation-type = &3.
+
+      l_len = strlen( mw_yrelation-type ).
+
+      subtract 1 from: l_len.
+
+      try .
+          mw_yrelation-time = mw_yrelation-type+l_len.
+        catch cx_sy_range_out_of_bounds.
+      endtry.
+
+      append mw_yrelation to mt_yrelation.
+
+    end-of-definition.
+
+    ad:
+        1 1 'TB',
+        1 2 'CB',
+        1 3 'BB',
+        1 4 'RAB',
+        1 5 'REB',
+        1 6 'BB',
+        1 7 'CB',
+        1 8 'TB',
+        2 1 'PB',
+        2 2 'PB',
+        2 3 'PB',
+        2 4 'PB',
+        2 5 'PB',
+        2 6 'PB',
+        2 7 'PB',
+        2 8 'PB',
+        7 1 'PP',
+        7 2 'PP',
+        7 3 'PP',
+        7 4 'PP',
+        7 5 'PP',
+        7 6 'PP',
+        7 7 'PP',
+        7 8 'PP',
+        8 1 'TP',
+        8 2 'CP',
+        8 3 'BP',
+        8 4 'RAP',
+        8 5 'REP',
+        8 6 'BP',
+        8 7 'CP',
+        8 8 'TP'.
+
+  endmethod.                    "constructor
+
+  method start.
+    call screen 0100.
+  endmethod.                    "start
+
+  method pbo.
+    set pf-status '0100'.
+    set titlebar '0100'.
+
+    lcl_main=>start_objects( ).
+
+    case m_jogador.
+      when 'B'.
+        g_info = 'Vez do Jogador de Branco!'.
+      when 'P'.
+        g_info = 'Vez do Jogador de Preto!'.
+    endcase.
+
+  endmethod.                    "pbo
+
+  method pai.
+    case sy-ucomm.
+      when 'BACK' or 'EXIT' or 'CANC'.
+        leave program.
+    endcase.
+  endmethod.                    "pai
+
+  method start_objects.
+
+    call method mo_me->create_grid( ).
+
+  endmethod.                    "start_objects
+
+  method create_grid.
+
+    data: l_row type i,
+          l_column type i,
+          url  type cndp_url,
+          w_yrelations type ty_yrelations.
+
+    data event_tab type cntl_simple_events.
+    data event_tab_line type cntl_simple_event.
+
+    check mo_container is initial.
+
+*    event_tab_line-eventid = cl_gui_picture=>eventid_picture_dblclick.
+*    append event_tab_line to event_tab.
+
+    create object mo_container
+      exporting
+        container_name = 'CC_GRID'.
+
+    create object mo_split
+      exporting
+        parent  = mo_container
+        rows    = 8
+        columns = 8.
+
+    do 8 times.
+      clear mw_ycontainers.
+      add 1 to l_column.
+      clear l_row.
+      do 8 times.
+
+        add 1 to l_row.
+
+        mw_ycontainers-column = l_column.
+        mw_ycontainers-row    = l_row.
+
+        mw_ycontainers-objcont = mo_split->get_container( row = l_row column = l_column ).
+
+        "-->Set Border Style
+        call method mo_split->set_row_mode( 1 ).
+        call method mo_split->set_column_sash( id = 1 type = 2 value = 1 ).
+        call method mo_split->set_row_sash( id = 1 type = 2 value = 1 ).
+        call method mo_split->set_border( '' ).
+
+
+        create object mw_ycontainers-picture
+          exporting
+            parent = mw_ycontainers-objcont.
+
+        create object mo_events.
+
+        set handler mo_events->ondrag
+                       for mw_ycontainers-picture.
+
+        set handler mo_events->ondrop
+                       for mw_ycontainers-picture.
+
+        mo_events->m_row = l_row.
+        mo_events->m_column = l_column.
+
+        " Set the display mode to 'normal' (0)
+        call method mw_ycontainers-picture->set_display_mode
+          exporting
+            display_mode = cl_gui_picture=>display_mode_fit_center.
+
+        " Set 3D Border
+        call method mw_ycontainers-picture->set_3d_border( border = 1 ).
+
+        create object mw_ycontainers-behaviour_dnd.
+        call method mw_ycontainers-behaviour_dnd->add
+          exporting
+            flavor     = 'dnd'
+            dragsrc    = 'X'
+            droptarget = 'X'
+            effect     = cl_dragdrop=>copy.
+
+        call method mw_ycontainers-picture->set_dragdrop_picture
+          exporting
+            dragdrop = mw_ycontainers-behaviour_dnd.
+
+        call method mw_ycontainers-picture->set_dragdrop_control
+          exporting
+            dragdrop = mw_ycontainers-behaviour_dnd.
+
+        call method mw_ycontainers-picture->set_registered_events
+          exporting
+            events = event_tab.
+
+        clear w_yrelations.
+        read table mt_yrelation into w_yrelations
+                       with key  row = l_row
+                                 column = l_column.
+
+        if w_yrelations-objname <> space.
+
+          clear url.
+          call function 'DP_PUBLISH_WWW_URL'
+            exporting
+              objid    = w_yrelations-objname
+              lifetime = cndp_lifetime_transaction
+            importing
+              url      = url
+            exceptions
+              others   = 1.
+
+          call method mw_ycontainers-picture->load_picture_from_url_async
+            exporting
+              url = url.
+
+        endif.
+
+        append mw_ycontainers to mt_ycontainers.
+
+      enddo.
+
+    enddo.
+
+
+  endmethod.                    "create_grid
+
+
+  method move.
+
+    data: w_yrelations type ty_yrelations,
+*          w_ycontainers type ty_ycontainers,
+          l_url  type cndp_url.
+
+    field-symbols: <w_yrelations> type ty_yrelations,
+                   <w_ycontainers> type ty_ycontainers.
+
+    "-->Check no moving
+
+    if mw_ymove-column_i = mw_ymove-column_f and mw_ymove-row_i = mw_ymove-row_f.
+      return.
+    endif.
+
+
+    "-->Carregue a posição inicial:
+    clear w_yrelations.
+    read table lcl_main=>mo_me->mt_yrelation assigning <w_yrelations>
+                       with key  row =    mw_ymove-row_i
+                                 column = mw_ymove-column_i.
+
+    check sy-subrc = 0.
+
+    if <w_yrelations>-objname <> space.
+      "-->Limpa a imagem inicial:
+      unassign <w_ycontainers>.
+      read table lcl_main=>mo_me->mt_ycontainers assigning <w_ycontainers>
+                                 with key  row = mw_ymove-row_i
+                                        column = mw_ymove-column_i.
+
+      check sy-subrc = 0.
+
+      call method <w_ycontainers>-picture->clear_picture( ).
+
+      "-->Seta a imagem inicial com a final
+      read table lcl_main=>mo_me->mt_ycontainers assigning <w_ycontainers>
+                           with key  row = mw_ymove-row_f
+                                  column = mw_ymove-column_f.
+
+      clear l_url.
+      call function 'DP_PUBLISH_WWW_URL'
+        exporting
+          objid    = <w_yrelations>-objname
+          lifetime = cndp_lifetime_transaction
+        importing
+          url      = l_url
+        exceptions
+          others   = 1.
+
+      call method <w_ycontainers>-picture->load_picture_from_url_async
+        exporting
+          url = l_url.
+
+      "-->Limpa a tabela referência e/ou Adiciona/altera a linha de destino:
+      clear w_yrelations.
+      w_yrelations = <w_yrelations>.
+
+      read table lcl_main=>mo_me->mt_yrelation assigning <w_yrelations>
+                            with key row = mw_ymove-row_f
+                                  column = mw_ymove-column_f .
+
+      if <w_yrelations>-type = 'REP' or <w_yrelations>-type = 'REB'.
+        m_end_game = 'X'.
+      endif.
+
+      if sy-subrc = 0.
+        <w_yrelations>-column  = mw_ymove-column_f.
+        <w_yrelations>-row     = mw_ymove-row_f.
+        <w_yrelations>-objname = w_yrelations-objname.
+        <w_yrelations>-type    = w_yrelations-type.
+        <w_yrelations>-time    = w_yrelations-time.
+        <w_yrelations>-moves   = w_yrelations-moves + 1.
+
+      else.
+        w_yrelations-column  = mw_ymove-column_f.
+        w_yrelations-row     = mw_ymove-row_f.
+        w_yrelations-moves   = w_yrelations-moves + 1.
+        append w_yrelations to lcl_main=>mo_me->mt_yrelation.
+      endif.
+
+      "-->Deletando a linha de origem:
+      delete lcl_main=>mo_me->mt_yrelation where row    = mw_ymove-row_i
+                                             and column = mw_ymove-column_i.
+
+    endif.
+
+
+  endmethod.                    "move
+
+
+  method check_move.
+
+    data: l_x type i.
+    data: l_y type i.
+    data: l_ok.
+
+    case mw_ymove-relations_i-type.
+      when 'PP' or 'PB'.
+        if mw_ymove-relations_f-objname = space. "Sem comer ninguem( só horizontal )
+
+          if mw_ymove-row_i <> mw_ymove-row_f. "Verifique movimento só horizontal
+            message 'Movimento não permitido' type 'S' display like 'E'.
+            return.
+          endif.
+
+          "-->Verificar a quantidade de andadas
+          l_x = abs( mw_ymove-column_f - mw_ymove-column_i ).
+
+          if mw_ymove-relations_i-moves is initial.
+            if l_x > 2.
+              message 'Movimento não permitido' type 'S' display like 'E'.
+              return.
+            endif.
+          else.
+            if l_x <> 1.
+              message 'Movimento não permitido' type 'S' display like 'E'.
+              return.
+            endif.
+          endif.
+
+        else. "-->Vai comer ( pode ser diagonal, mas só 1 box )
+
+          l_x = abs( mw_ymove-column_f - mw_ymove-column_i ).
+          l_y = abs( mw_ymove-row_i - mw_ymove-row_f ).
+
+          if l_x <> 1 or l_y <> 1.
+            message 'Movimento não permitido' type 'S' display like 'E'.
+            return.
+          endif.
+
+        endif.
+
+      when 'BP' or 'BP'.
+
+        "-->
+
+        call method me->caminho_livre
+          receiving
+            r_ok = l_ok.
+
+        if l_ok = space.
+          message 'Não se pode passar por cima dos seus coleguinhas!' type 'S' display like 'E'.
+          return.
+        endif.
+
+      when 'RAP' or  'RAB'.
+
+        "==Super poderes!
+        call method me->caminho_livre
+          receiving
+            r_ok = l_ok.
+
+        if l_ok = space.
+          message 'Não se pode passar por cima dos seus coleguinhas!' type 'S' display like 'E'.
+          return.
+        endif.
+
+      when 'REP' or 'REB'.
+
+        l_x = abs( mw_ymove-column_f - mw_ymove-column_i ).
+        l_y = abs( mw_ymove-row_i - mw_ymove-row_f ).
+
+        if ( l_x = 1 and l_y = 0 ) or ( l_x = 0 and l_y = 1 ).
+        else.
+          message 'Movimento não permitido' type 'S' display like 'E'.
+          return.
+        endif.
+
+      when 'CP' or 'CB'.
+
+        l_x = abs( mw_ymove-column_f - mw_ymove-column_i ).
+        l_y = abs( mw_ymove-row_i - mw_ymove-row_f ).
+
+        if ( l_x = 2 and l_y = 1 ) or ( l_x = 1 and l_y = 2 ).
+        else.
+          message 'Movimento não permitido' type 'S' display like 'E'.
+          return.
+        endif.
+
+      when 'TP' or 'TB'.
+
+
+        l_x = abs( mw_ymove-column_f - mw_ymove-column_i ).
+        l_y = abs( mw_ymove-row_i - mw_ymove-row_f ).
+
+        if ( l_x = 0 and l_y <> 0 ) or ( l_x <> 0 and l_y = 0 ).
+        else.
+          message 'Movimento não permitido' type 'S' display like 'E'.
+          return.
+        endif.
+
+
+        call method me->caminho_livre
+          receiving
+            r_ok = l_ok.
+
+        if l_ok = space.
+          message 'Não se pode passar por cima dos seus coleguinhas!' type 'S' display like 'E'.
+          return.
+        endif.
+
+    endcase.
+
+    "-->Verifique: Verifique canibalismo!
+
+
+    if mw_ymove-relations_i-time = mw_ymove-relations_f-time.
+      message 'Cabibalismo não permitido' type 'S' display like 'E'.
+      return.
+    endif.
+
+
+    r_ok = 'X'.
+  endmethod.                    "check_move
+
+  method caminho_livre.
+
+    data: l_row_diff type i.
+    data: l_column_diff type i.
+    data: l_has_someone.
+    data: w_yrelations type ty_yrelations.
+    data: l_row type i.
+    data: l_column type i.
+    data: l_signal_row.
+    data: l_signal_column.
+    data: l_x type i.
+    data: l_y type i.
+    data: l_move_type type char2.
+
+    l_row = mw_ymove-row_i.
+    l_column = mw_ymove-column_i.
+
+    l_row_diff = abs( mw_ymove-row_i - mw_ymove-row_f ).
+    l_column_diff = abs( mw_ymove-column_i - mw_ymove-column_f ).
+
+    "-->Verificar se vai para frente ou para trás...
+    if mw_ymove-row_i < mw_ymove-row_f.
+      l_signal_row = '+'.
+    else.
+      l_signal_row = '-'.
+    endif.
+
+    if mw_ymove-column_i < mw_ymove-column_f.
+      l_signal_column = '+'.
+    else.
+      l_signal_column = '-'.
+    endif.
+
+    "-->No caso de valor 0
+    if l_row_diff is initial.
+      add 1 to l_row_diff.
+    endif.
+
+    "-->No caso de valor 0
+    if l_column_diff is initial.
+      add 1 to l_column_diff.
+    endif.
+
+    "-->Verificar o tipo de movimento
+    l_x = abs( mw_ymove-column_f - mw_ymove-column_i ).
+    l_y = abs( mw_ymove-row_i - mw_ymove-row_f ).
+
+    if ( l_x = 0 and l_y <> 0 ).
+      l_move_type = 'X'.
+    elseif ( l_x <> 0 and l_y = 0 ).
+      l_move_type = 'Y'.
+    elseif ( l_x <> 0 and l_y <> 0 ).
+      l_move_type = 'XY'.
+    endif.
+
+    case l_move_type.
+      when 'X'.
+
+        do l_row_diff times.
+
+          case l_signal_row.
+            when '+'.
+              add 1 to l_row.
+            when '-'.
+              subtract 1 from l_row.
+          endcase.
+
+          "-->Ignore o caminho final (para saber se é quem vai ser comido)
+          if ( l_row = mw_ymove-relations_f-row and l_column = mw_ymove-relations_f-column ).
+            continue.
+          endif.
+
+          "-->
+          clear w_yrelations.
+          read table mt_yrelation into w_yrelations
+                                        with key row    = l_row
+                                                 column = l_column.
+
+          if w_yrelations-objname is not initial.
+            l_has_someone = 'X'.
+            exit.
+          endif.
+
+          case l_signal_row.
+            when '+'.
+              add 1 to l_row.
+            when '-'.
+              subtract 1 from l_row.
+          endcase.
+
+        enddo.
+
+
+      when 'Y'.
+
+        do l_column_diff times.
+
+          case l_signal_column.
+            when '+'.
+              add 1 to l_column.
+            when '-'.
+              subtract 1 from l_column.
+          endcase.
+
+          "-->Ignore o caminho final (para saber se é quem vai ser comido)
+          if ( l_row = mw_ymove-relations_f-row and l_column = mw_ymove-relations_f-column ).
+            continue.
+          endif.
+
+
+          "-->
+          clear w_yrelations.
+          read table mt_yrelation into w_yrelations
+                                        with key row    = l_row
+                                                 column = l_column.
+
+          if w_yrelations-objname is not initial.
+            l_has_someone = 'X'.
+            exit.
+          endif.
+
+        enddo.
+
+      when 'XY'.
+
+        do l_column_diff times.
+          case l_signal_column.
+            when '+'.
+              add 1 to l_column.
+            when '-'.
+              subtract 1 from l_column.
+          endcase.
+
+          do l_row_diff times.
+            case l_signal_row.
+              when '+'.
+                add 1 to l_row.
+              when '-'.
+                subtract 1 from l_row.
+            endcase.
+
+          "-->Ignore o caminho final (para saber se é quem vai ser comido)
+          if ( l_row = mw_ymove-relations_f-row and l_column = mw_ymove-relations_f-column ).
+            continue.
+          endif.
+
+            "-->
+            clear w_yrelations.
+            read table mt_yrelation into w_yrelations
+                                          with key row    = l_row
+                                                   column = l_column.
+
+            if w_yrelations-objname is not initial.
+              l_has_someone = 'X'.
+              exit.
+            endif.
+
+          enddo.
+
+          if l_has_someone = 'X'.
+            exit.
+          endif.
+
+        enddo.
+
+    endcase.
+
+    if l_has_someone = 'X'.
+      r_ok = space.
+    else.
+      r_ok = 'X'.
+    endif.
+
+  endmethod.                    "caminho_livre
+
+
+  method start_move.
+
+    data: l_ok.
+
+    "-->Verificando se a movimentação é permitida
+    call method lcl_main=>mo_me->check_move(
+      receiving
+      r_ok = l_ok ).
+
+    check l_ok = 'X'.
+
+    "-->Movimentando
+    call method lcl_main=>mo_me->move( ).
+
+    if lcl_main=>m_jogador = 'B'.
+      lcl_main=>m_jogador = 'P'.
+    else.
+      lcl_main=>m_jogador = 'B'.
+    endif.
+
+
+    if m_end_game = 'X'.
+      message 'Jogo Ganho' type 'I'.
+    endif.
+
+  endmethod.                    "start_move
+
+  method set_move.
+
+
+    clear mw_ymove.
+
+    mw_ymove-column_i = i_column_i.
+    mw_ymove-column_f = i_column_f.
+    mw_ymove-row_i = i_row_i.
+    mw_ymove-row_f = i_row_f.
+
+
+    clear mw_ymove-relations_i.
+    read table mt_yrelation into mw_ymove-relations_i
+                    with key row = i_row_i
+                             column = i_column_i.
+
+    clear mw_ymove-relations_f.
+    read table mt_yrelation into mw_ymove-relations_f
+                    with key row = i_row_f
+                             column = i_column_f.
+
+  endmethod.                    "set_move
+
+endclass.                    "lcl_main IMPLEMENTATION
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_event IMPLEMENTATION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+class lcl_event implementation.
+
+
+  method ondrag.
+    dragdropobj->object = me.
+  endmethod.                    "event_handler_picture_dblclick
+
+
+  method ondrop.
+
+    data: lo_event type ref to lcl_event,
+          l_ok type c.
+
+    lo_event ?= dragdropobj->object.
+
+    call method lcl_main=>mo_me->set_move(
+      i_row_i = lo_event->m_row
+      i_column_i = lo_event->m_column
+      i_row_f = me->m_row
+      i_column_f = me->m_column ).
+
+    "-->Verifique se é a vez do jogador correto:
+    if lcl_main=>mo_me->mw_ymove-relations_i-time <> lcl_main=>m_jogador.
+      message 'Vez do outro jogador...' type 'S'.
+      return.
+    endif.
+
+    call method lcl_main=>mo_me->start_move( ).
+
+    suppress dialog.
+
+  endmethod.                    "event_handler_picture_dblclick
+
+endclass.                    "lcl_event IMPLEMENTATION

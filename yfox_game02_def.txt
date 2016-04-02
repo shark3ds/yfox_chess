@@ -1,0 +1,106 @@
+*&---------------------------------------------------------------------*
+*&  Include           YFOX_GAME01_DEF
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Report  YFOX_GAME01
+*& Chess feito por Raphael Bertani da AbapFox - Venha conhecer: www.abapfox.org
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_event DEFINITION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+class lcl_event definition.
+
+  public section.
+
+    data: m_name type char10,
+          m_row  type i,
+          m_column type i.
+
+    methods ondrag for event ondrag
+     of cl_gui_picture importing dragdropobj.
+
+    methods ondrop for event ondrop
+      of cl_gui_picture importing dragdropobj.
+
+endclass.                    "lcl_event DEFINITION
+
+*----------------------------------------------------------------------*
+*       CLASS lcl_main DEFINITION
+*----------------------------------------------------------------------*
+*
+*----------------------------------------------------------------------*
+class lcl_main definition.
+
+  public section.
+
+    class-methods: class_constructor.
+
+    class-methods: start,
+                   pbo,
+                   pai,
+                   start_objects.
+
+
+    methods: create_grid,
+             constructor,
+             close_both,
+             move ,
+             set_move importing i_row_i type i
+                            i_column_i type i
+                            i_row_f type i
+                            i_column_f type i,
+             check_move returning value(r_ok) type char1,
+             start_move,
+             caminho_livre RETURNING VALUE(r_ok) type char1.
+
+
+    class-data: mo_me type ref to lcl_main,
+                mo_events type ref to lcl_event,
+                m_cancel_dc,
+                m_jogador type char1 VALUE 'B',
+                m_end_game.
+
+
+    data: mo_split type ref to cl_gui_splitter_container,
+          mo_container type ref to cl_gui_custom_container.
+
+    types: begin of ty_ycontainers,
+          name type char10,
+          column type i,
+          row    type i,
+          objcont type ref to cl_gui_container,
+          picture type ref to cl_gui_picture,
+          behaviour_dnd type ref to cl_dragdrop,
+          state   type char1,
+          end of ty_ycontainers.
+
+    types: begin of ty_yrelations,
+      column  type i,
+      row     type i,
+      objname type w3objid,
+      type    type char3,
+      moves   type i,
+      time    type c LENGTH 1,
+      end of ty_yrelations.
+
+    types: begin of ty_ymove,
+      column_i  type i,
+      row_i     type i,
+      column_f  type i,
+      row_f     type i,
+      relations_i type ty_yrelations,
+      relations_f type ty_yrelations,
+    end of ty_ymove.
+
+    data: mt_ycontainers type standard table of ty_ycontainers,
+          mw_ycontainers type ty_ycontainers,
+          mt_yrelation   type standard table of ty_yrelations,
+          mw_yrelation   type ty_yrelations,
+          mw_ymove       type ty_ymove.
+
+
+endclass.                    "lcl_main DEFINITION
